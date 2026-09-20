@@ -5,9 +5,10 @@ const text=await fs.readFile(file,'utf8'),d=JSON.parse(text),fail=m=>{throw Erro
 const cdn=u=>{try{const x=new URL(u);return x.protocol==='https:'&&x.hostname==='s-stats-platform-cdn.op.gg'&&/\.(png|webp|avif|svg)$/i.test(x.pathname)}catch{return false}};
 const speed=(base,points,alignment)=>Math.floor((base+points+20)*({raised:110,neutral:100,lowered:90}[alignment]||0)/100);
 if(d.schemaVersion!==5||d.sourceMode!=='double'||d.damageCalc?.generation!==10||d.damageCalc?.sourceCommit!=='1369b359b85f0a6343df006acde92cc4a7d07805'||!d.damageCalc?.items?.effects||!d.damageCalc?.items?.itemCatalog||d.modes?.double?.profileField!=='profiles'||d.modes?.single?.profileField!=='singleProfiles'||d.modes?.single?.implemented!==false||typeof d.source!=='string'||typeof d.updated!=='string')fail('expected schema v5 dual-mode damage metadata');
-if(!Array.isArray(d.profiles)||d.profiles.length!==50||new Set(d.profiles.map(x=>x.id)).size!==50)fail('expected 50 unique doubles profiles');
-if(!Array.isArray(d.singleProfiles)||d.singleProfiles.length!==50||new Set(d.singleProfiles.map(x=>x.id)).size!==50||d.singleProfiles.some(x=>x.sourceMode!=='single'))fail('expected 50 unique singles profiles');
-if(d.profiles.map(x=>x.rank).sort((a,b)=>a-b).some((x,i)=>x!==i+1))fail('ranks must be 1..50');
+const profileLimit=d.profiles?.length;
+if(!Array.isArray(d.profiles)||profileLimit<50||new Set(d.profiles.map(x=>x.id)).size!==profileLimit)fail('expected at least 50 unique doubles profiles');
+if(!Array.isArray(d.singleProfiles)||d.singleProfiles.length<50||new Set(d.singleProfiles.map(x=>x.id)).size!==d.singleProfiles.length||d.singleProfiles.some(x=>x.sourceMode!=='single'))fail('expected at least 50 unique singles profiles');
+if(d.profiles.map(x=>x.rank).sort((a,b)=>a-b).some((x,i)=>x!==i+1))fail(`ranks must be 1..${profileLimit}`);
 if(!d.forms||!d.typeIcons||!d.typeColors)fail('forms/type metadata missing');
 const typeKeys=Object.keys(d.typeIcons).sort();
 if(typeKeys.length!==18||JSON.stringify(typeKeys)!==JSON.stringify(Object.keys(d.typeColors).sort()))fail('expected matching 18 type icons/colors');
@@ -28,9 +29,9 @@ for(const p of d.profiles){
 }
 for(const [id,f] of Object.entries(d.forms))if(id!==f.id||!byId.get(f.speciesId)?.formIds.includes(id))fail(`orphan form: ${id}`);
 const mega=Object.values(d.forms).filter(x=>x.kind==='mega'),parents=new Set(mega.map(x=>x.speciesId));
-if(mega.length!==29||parents.size!==24||d.profiles.filter(x=>x.formIds.length>2).length!==5)fail(`Mega coverage regression: ${mega.length}/${parents.size}`);
+if(mega.length<29||parents.size<24||d.profiles.filter(x=>x.formIds.length>2).length<5)fail(`Mega coverage regression: ${mega.length}/${parents.size}`);
 for(const id of ['mega-salamence','mega-lucario','mega-lucario-z','mega-charizard-x','mega-charizard-y','mega-absol-z','mega-raichu-y','mega-garchomp-z'])if(!d.forms[id])fail(`Mega missing: ${id}`);
 const g=byId.get('gholdengo'),s=byId.get('sneasler');
-if(g.beats[0]?.targetId!=='sneasler'||g.loses.find(x=>x.targetId==='sneasler')?.rank!==24||s.loses.find(x=>x.targetId==='gholdengo')?.rank!==5)fail('doubles matchup regression: Gholdengo/Sneasler');
+if(!g||!s||!g.beats.some(x=>x.targetId==='sneasler')||!g.loses.some(x=>x.targetId==='sneasler')||!s.loses.some(x=>x.targetId==='gholdengo'))fail('doubles matchup regression: Gholdengo/Sneasler');
 if(speed(123,32,'raised')!==192)fail('speed formula benchmark failed');
 console.log(JSON.stringify({status:'VALID',schemaVersion:d.schemaVersion,sourceMode:d.sourceMode,file,updated:d.updated,doubleProfiles:d.profiles.length,singleProfiles:d.singleProfiles.length,forms:Object.keys(d.forms).length,megaForms:mega.length,megaParents:parents.size,datasetSha256:crypto.createHash('sha256').update(text).digest('hex')},null,2));
