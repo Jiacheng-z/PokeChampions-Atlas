@@ -1,0 +1,5 @@
+.DS_Store
+.update/
+*.tmp
+*.log
+归档_计算.zip

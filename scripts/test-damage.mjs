@@ -1,0 +1,24 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import path from 'node:path';
+
+const root=path.resolve(process.argv[2]||path.join(import.meta.dirname,'..'));
+const data=JSON.parse(fs.readFileSync(path.join(root,'data.json'),'utf8'));
+const context={console};vm.createContext(context);
+vm.runInContext(fs.readFileSync(path.join(root,'damage-engine.js'),'utf8'),context);
+const damage=context.ChampionsDamage;
+const sylveon=data.profiles.find(profile=>profile.id==='sylveon');
+const salamence=data.profiles.find(profile=>profile.id==='salamence');
+const hyperVoice=sylveon.moves.find(move=>move.href?.endsWith('/hyper-voice'));
+if(!hyperVoice)throw Error('Hyper Voice mapping missing');
+const result=damage.across(data,sylveon,salamence,hyperVoice);
+if(result.base.resolvedType!=='fairy')throw Error(`Pixilate failed: ${result.base.resolvedType}`);
+if(result.base.effectiveness!==2)throw Error(`Fairy effectiveness failed: ${result.base.effectiveness}`);
+if(result.base.minPercent<100)throw Error(`TOP1 Fairy Feather/Pixilate result unexpectedly low: ${result.base.minPercent}%`);
+if(sylveon.heldItems[0].damageStatus!=='applied')throw Error('Sylveon TOP1 item was not classified as applied');
+const mega=result.details.find(detail=>detail.defenderForm==='mega-salamence');
+if(!mega||mega.defenderAbility!=='Aerilate')throw Error('Mega Salamence form ability precedence failed');
+if(!result.attackerRows?.length||result.attackerRows[0].attackerForm!=='sylveon')throw Error('Attacker-form grouping missing');
+const excluded=salamence.heldItems[0];
+if(excluded.damageStatus!=='excluded'||excluded.itemCategory!=='mega-stones')throw Error('Mega stone exclusion failed');
+console.log(JSON.stringify({status:'PASS',resolvedType:result.base.resolvedType,effectiveness:result.base.effectiveness,basePercent:[result.base.minPercent,result.base.maxPercent],megaPercent:[mega.minPercent,mega.maxPercent],sylveonItem:sylveon.heldItems[0].itemKey},null,2));
